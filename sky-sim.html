@@ -1,0 +1,254 @@
+<html>
+
+<head>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+
+<link href="http://code.jquery.com/ui/1.10.4/themes/ui-lightness/jquery-ui.css" rel="stylesheet">
+<script src="http://code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
+<style src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datetimepicker/4.17.42/css/bootstrap-datetimepicker-standalone.css"></style>
+
+<script>
+$(document).ready(function()  
+{
+
+    $( "#datepicker" ).datepicker();
+    $( "#datepicker" ).datepicker("setDate", "0");
+    // $( "#datepicker" ).datepicker("show");
+
+	function CalculateZenitalAbsolutes(turbidity, solar_zenith)
+	{
+		var ret = {}
+
+	    var Yz = (4.0453 * turbidity - 4.9710) * Math.tan((4/9 - turbidity/120) * (Math.PI - 2*solar_zenith)) - 0.2155 * turbidity + 2.4192;
+	    //var Y0 = (4.0453 * turbidity - 4.9710) * Math.tan((4/9 - turbidity/120) * (Math.PI)) - 0.2155 * turbidity + 2.4192;
+	    Y0 = 40;
+	    ret.Yz = Yz / Y0;
+	 
+	    var z3 = Math.pow(solar_zenith, 3);
+	    var z2 = Math.pow(solar_zenith, 2);
+	    var z = solar_zenith;
+	    var T_vec = [turbidity*turbidity, turbidity, 1.0];
+	 
+	    var x = [
+	         0.00166 * z3 - 0.00375 * z2 + 0.00209 * z + 0,
+	        -0.02903 * z3 + 0.06377 * z2 - 0.03202 * z + 0.00394,
+	         0.11693 * z3 - 0.21196 * z2 + 0.06052 * z + 0.25886 ];
+	    ret.xz = T_vec[0]*x[0] + T_vec[1]*x[1] + T_vec[2]*x[2]; // dot(T_vec, x);
+	 
+	    var y = [
+	         0.00275 * z3 - 0.00610 * z2 + 0.00317 * z + 0,
+	        -0.04214 * z3 + 0.08970 * z2 - 0.04153 * z + 0.00516,
+	         0.15346 * z3 - 0.26756 * z2 + 0.06670 * z + 0.26688 ];
+	    ret.yz = T_vec[0]*y[0] + T_vec[1]*y[1] + T_vec[2]*y[2]; // dot(T_vec, y);
+
+	    return ret;
+	}
+	 
+	function CalculateCoefficents(turbidity)
+	{
+		var ret = {};
+
+	    var coeffsY = {};
+	    coeffsY.A =  0.1787 * turbidity - 1.4630;
+	    coeffsY.B = -0.3554 * turbidity + 0.4275;
+	    coeffsY.C = -0.0227 * turbidity + 5.3251;
+	    coeffsY.D =  0.1206 * turbidity - 2.5771;
+	    coeffsY.E = -0.0670 * turbidity + 0.3703;
+	    ret.coeffsY = coeffsY;
+	 
+	    var coeffsx = {};
+	    coeffsx.A = -0.0193 * turbidity - 0.2592;
+	    coeffsx.B = -0.0665 * turbidity + 0.0008;
+	    coeffsx.C = -0.0004 * turbidity + 0.2125;
+	    coeffsx.D = -0.0641 * turbidity - 0.8989;
+	    coeffsx.E = -0.0033 * turbidity + 0.0452;
+	    ret.coeffsx = coeffsx;
+	 
+	    var coeffsy = {};
+	    coeffsy.A = -0.0167 * turbidity - 0.2608;
+	    coeffsy.B = -0.0950 * turbidity + 0.0092;
+	    coeffsy.C = -0.0079 * turbidity + 0.2102;
+	    coeffsy.D = -0.0441 * turbidity - 1.6537;
+	    coeffsy.E = -0.0109 * turbidity + 0.0529;
+	    ret.coeffsy = coeffsy;
+
+	    return ret;
+	}
+
+	function Perez( zenith, gamma, coeffs )
+	{
+	    return  (1 + coeffs.A*Math.exp(coeffs.B/Math.cos(zenith))) *
+	            (1 + coeffs.C*Math.exp(coeffs.D*gamma)+coeffs.E*Math.pow(Math.cos(gamma), 2));
+	}
+
+	function gamma_correct(v)
+	{
+		return Math.max(Math.min( Math.pow(v, (1/1.8)), 1), 0)
+	}
+
+	function Yxy_to_RGB(Y, x, y)
+	{
+	    var X = x/y*Y;
+	    var Z = (1.0-x-y)/y*Y;
+	    return {
+	    	r : gamma_correct( 3.2406 * X - 1.5372 * Y - 0.4986 * Z ),
+	    	g : gamma_correct(-0.9689 * X + 1.8758 * Y + 0.0415 * Z ),
+	    	b : gamma_correct( 0.0557 * X - 0.2040 * Y + 1.0570 * Z )};
+	}
+
+	function Gamma(zenith, azimuth,   solar_zenith, solar_azimuth)
+	{
+	    return Math.acos(
+	    	Math.sin(solar_zenith)*Math.sin(zenith)*Math.cos(azimuth-solar_azimuth)+Math.cos(solar_zenith)*Math.cos(zenith));
+	}
+
+	function Calc_Sky_RGB(zenith, azimuth,   zen_abs, solar_zenith, solar_azimuth, coeffs_mtx)
+	{ 
+	    var gamma = Gamma(zenith, azimuth,  solar_zenith, solar_azimuth);
+	    zenith = Math.min(zenith, Math.PI/2.0);
+	    var Yp = zen_abs.Yz * Perez(zenith, gamma, coeffs_mtx.coeffsY) / Perez(0.0, solar_zenith, coeffs_mtx.coeffsY);
+	    var xp = zen_abs.xz * Perez(zenith, gamma, coeffs_mtx.coeffsx) / Perez(0.0, solar_zenith, coeffs_mtx.coeffsx);
+	    var yp = zen_abs.yz * Perez(zenith, gamma, coeffs_mtx.coeffsy) / Perez(0.0, solar_zenith, coeffs_mtx.coeffsy);
+	 
+	    return Yxy_to_RGB(Yp, xp, yp);
+	}
+
+	function html_rgb(r, g, b)
+	{
+
+		return "rgb("+Math.floor(r*255)+","+Math.floor(g*255)+","+Math.floor(b*255)+")";
+	}
+
+	function scale_range(k,  k_min, k_max,  v_min, v_max)
+	{
+		return (k-k_min)/(k_max-k_min) * (v_max-v_min) + v_min
+	}
+
+	function deg2rad(deg)
+	{
+		return deg * (Math.PI/180);
+	}
+
+
+/*
+	function julian_date(date, tz_offset)
+	{
+		d = new Date(date);
+		d.setHours(0);
+		d.setMinutes(0);
+		d.setSeconds(0);
+		var unix_time = d.getTime()/1000;
+		//return Math.floor((153*d.getMonth()+2)/5);
+		return unix_time / 86400 + 2440587.5; 
+	}
+*/
+
+	function day_of_year(date)
+	{
+		var start = new Date(date.getFullYear(), 0, 0);
+		var diff = date - start;
+		var oneDay = 1000 * 60 * 60 * 24;
+		var day = Math.floor(diff / oneDay);
+		return day;
+	}
+
+	var timer = 0
+
+    var refreshId = setInterval( function()
+    {
+		timer = timer + 0.25
+
+    	var turbidity = parseFloat($('#turbidity').val());
+    	var longitude = deg2rad(parseFloat($('#longitude').val()));
+    	var latitude = deg2rad(parseFloat($('#latitude').val()));
+		var time_zone_meridian = deg2rad(parseFloat($('#tz_sm').val()));
+		var date = $('#datepicker').datepicker("getDate");
+
+		var tz_offset = Math.floor(time_zone_meridian/deg2rad(15)+0.5);
+		// var julian = julian_date(date, tz_offset);
+		var julian = day_of_year(date)
+		total_hours_today = timer % 24;
+
+		time_str = Math.floor(total_hours_today) + ":" + Math.floor((total_hours_today - Math.floor(total_hours_today))*60)
+		$('#curtime').val(time_str);
+
+		var solar_time =
+			total_hours_today +
+			0.170 * Math.sin((4*Math.PI*(julian-80))/373) -
+			0.129 * Math.sin((2*Math.PI*(julian-8))/355) +
+			(12*(time_zone_meridian-longitude)/Math.PI)
+
+		var declination = 0.4093 * Math.sin(2*Math.PI * (julian - 81) / 368);
+		console.log( "declination deg = " + (declination*180/Math.PI));
+
+		var sin_l = Math.sin(latitude)
+		var cos_l = Math.cos(latitude)
+		var sin_d = Math.sin(declination)
+		var cos_d = Math.cos(declination)
+		var cos_pi_t_12 = Math.cos(Math.PI*solar_time/12)
+		var sin_pi_t_12 = Math.sin(Math.PI*solar_time/12)
+		var solar_zenith = Math.PI/2 - Math.asin( sin_l*sin_d - cos_l*cos_d*cos_pi_t_12 );
+		var solar_azimuth = Math.atan2( (-cos_d*sin_pi_t_12), (cos_l*sin_d-sin_l*cos_d*cos_pi_t_12) );
+
+		// console.log("declination = " + declination)
+		// console.log("solar_zenith = " + solar_zenith)
+		// console.log("solar_azimuth = " + solar_azimuth)
+
+		zen_abs = CalculateZenitalAbsolutes(turbidity, solar_zenith)
+		coeffs_mtx = CalculateCoefficents(turbidity)
+
+		// Visualize
+        var canvas = document.getElementById("sky");
+        var ctx = canvas.getContext("2d");
+        // ctx.fillRect(10, 10, 100, 100);
+
+        var resolution_x = 128;
+        var resolution_y = 32;
+        var scale_x = 360*4;
+        var scale_y = (80-6)*4;
+
+		for (var row=0; row<1; row+=(1/resolution_y))
+		{
+			for (var col=0; col<1; col+=(1/resolution_x))
+			{
+				azimuth = scale_range(col, 0,1, deg2rad(0), deg2rad(360));
+				zenith = scale_range(row, 0,1, deg2rad(6), deg2rad(80));
+
+				var rgb = Calc_Sky_RGB(zenith, azimuth,  zen_abs, solar_zenith, solar_azimuth, coeffs_mtx);
+		        ctx.fillStyle = html_rgb(rgb.r, rgb.g, rgb.b);
+
+				// coordinates of the top-left corner
+				var y = row * scale_y;
+				var x = col * scale_x;
+				ctx.fillRect(x, y, scale_x/resolution_x, scale_y/resolution_y);
+			}
+		}
+
+    //    $('#img-container').load('images/gallery/best/random.php?'+r);
+    }, 250);
+});
+</script>
+
+</head>
+
+<body>
+<div>
+	<div>
+		Latitude: <input id="latitude" type="text" value="60.192059" />
+		Longitude: <input id="longitude" type="text" value="24.945831"/>
+		Time zone standard meridian: <input id="tz_sm" type="text" value="25" />
+	</div>
+	<div>
+		Date: <input id="datepicker" type="text" />
+		Time: <input id="curtime" type="text" readonly />
+	</div>
+	<div>
+		Turbidity: <input id="turbidity" class="numbertype" type="text" value="4" /> (0=pure air, very clear=2, haze=16, fog=32)
+	</div>
+</div>
+<div>
+	<canvas id="sky" width=800 height=800></canvas>
+</div>
+</body>
+
+</html>
