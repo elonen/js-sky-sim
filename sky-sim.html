@@ -190,17 +190,13 @@ $(document).ready(function()
 		var solar_zenith = Math.PI/2 - Math.asin( sin_l*sin_d - cos_l*cos_d*cos_pi_t_12 );
 		var solar_azimuth = Math.atan2( (-cos_d*sin_pi_t_12), (cos_l*sin_d-sin_l*cos_d*cos_pi_t_12) );
 
-		// console.log("declination = " + declination)
-		// console.log("solar_zenith = " + solar_zenith)
-		// console.log("solar_azimuth = " + solar_azimuth)
-
 		zen_abs = CalculateZenitalAbsolutes(turbidity, solar_zenith)
 		coeffs_mtx = CalculateCoefficents(turbidity)
 
 		// Visualize
         var canvas = document.getElementById("sky");
+        canvas.style.webkitFilter = "blur(3px)";
         var ctx = canvas.getContext("2d");
-        // ctx.fillRect(10, 10, 100, 100);
 
         var resolution_x = 128;
         var resolution_y = 32;
@@ -228,7 +224,6 @@ $(document).ready(function()
     }, 250);
 });
 </script>
-
 </head>
 
 <body>
@@ -246,6 +241,7 @@ $(document).ready(function()
 		Turbidity: <input id="turbidity" class="numbertype" type="text" value="4" /> (0=pure air, very clear=2, haze=16, fog=32)
 	</div>
 </div>
+<br/>
 <div>
 	<canvas id="sky" width=640 height=240></canvas>
 </div>
