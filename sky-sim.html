@@ -208,7 +208,7 @@ $(document).ready(function()
 			for (var col=0; col<1; col+=(1/resolution_x))
 			{
 				azimuth = deg2rad(scale_range(col, 0,1, -180,180));
-				zenith =  deg2rad(scale_range(row, 0,1,    6,80));
+				zenith =  deg2rad(scale_range(row, 0,1,    0,90));
 
 				var rgb = Calc_Sky_RGB(zenith, azimuth,  zen_abs, solar_zenith, solar_azimuth, coeffs_mtx);
 		        ctx.fillStyle = html_rgb(rgb.r, rgb.g, rgb.b);
