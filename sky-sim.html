@@ -204,15 +204,15 @@ $(document).ready(function()
 
         var resolution_x = 128;
         var resolution_y = 32;
-        var scale_x = 360*4;
-        var scale_y = (80-6)*4;
+        var scale_x = canvas.width;
+        var scale_y = canvas.height;
 
 		for (var row=0; row<1; row+=(1/resolution_y))
 		{
 			for (var col=0; col<1; col+=(1/resolution_x))
 			{
-				azimuth = scale_range(col, 0,1, deg2rad(0), deg2rad(360));
-				zenith = scale_range(row, 0,1, deg2rad(6), deg2rad(80));
+				azimuth = deg2rad(scale_range(col, 0,1, -180,180));
+				zenith =  deg2rad(scale_range(row, 0,1,    6,80));
 
 				var rgb = Calc_Sky_RGB(zenith, azimuth,  zen_abs, solar_zenith, solar_azimuth, coeffs_mtx);
 		        ctx.fillStyle = html_rgb(rgb.r, rgb.g, rgb.b);
@@ -247,7 +247,7 @@ $(document).ready(function()
 	</div>
 </div>
 <div>
-	<canvas id="sky" width=800 height=800></canvas>
+	<canvas id="sky" width=640 height=240></canvas>
 </div>
 </body>
 
